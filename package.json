@@ -1,0 +1,40 @@
+{
+    "name": "wedding-memory-backend",
+    "version": "1.0.0",
+    "author": "Ariel Zissu",
+    "main": "server.js",
+    "type": "module",
+    "engines": {
+        "node": ">=18.0.0"
+    },
+    "keywords": [
+        "express",
+        "cloudinary",
+        "file-upload",
+        "wedding-memory"
+    ],
+    "scripts": {
+        "start": "node src/server.js",
+        "dev": "nodemon src/server.js",
+        "dev:watch": "nodemon src/server.js"
+    },
+    "_moduleAliases": {
+        "@utils": "src/utils",
+        "@routes": "src/routes"
+    },
+    "dependencies": {
+        "cloudinary": "^1.41.3",
+        "cors": "^2.8.5",
+        "dotenv": "^16.4.7",
+        "express": "^4.21.2",
+        "google-auth-library": "^9.15.0",
+        "jwt-decode": "^4.0.0",
+        "mongoose": "^7.6.3",
+        "multer": "^1.4.5-lts.1",
+        "multer-storage-cloudinary": "^4.0.0"
+    },
+    "devDependencies": {
+        "nodemon": "^3.1.9",
+        "typescript": "^5.7.3"
+    }
+}
