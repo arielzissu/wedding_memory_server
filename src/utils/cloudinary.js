@@ -25,6 +25,7 @@ export const cloudinaryStorage = new CloudinaryStorage({
         "heif",
         "mp4",
         "mov",
+        "MOV",
         "avi",
         "3gp",
         "mkv",

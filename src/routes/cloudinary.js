@@ -7,10 +7,6 @@ const router = express.Router();
 
 const upload = multer({ storage: cloudinaryStorage });
 
-router.get("/hello", (req, res) => {
-  res.send("Hello");
-}); // TODO: delete this
-
 router.get("/images", getImages);
 router.post("/upload", upload.array("images"), uploadImages);
 router.delete("/image", deleteImage); // TODO: Validate route by google token
