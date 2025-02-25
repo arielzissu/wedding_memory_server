@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
 import { v2 as cloudinary } from "cloudinary";
+import { SUPPORTED_MEDIA_FORMATS } from "../constants/index.js";
 
 dotenv.config();
 
@@ -14,24 +15,7 @@ export const cloudinaryStorage = new CloudinaryStorage({
   cloudinary,
   params: (req, file) => {
     return {
-      allowed_formats: [
-        "jpg",
-        "jpeg",
-        "png",
-        "gif",
-        "webp",
-        "heic",
-        "heif",
-        "mp4",
-        "avi",
-        "3gp",
-        "mkv",
-        "MP4",
-        "MOV",
-        "AVI",
-        "3GP",
-        "MKV",
-      ],
+      allowed_formats: SUPPORTED_MEDIA_FORMATS,
       resource_type: "auto",
     };
   },
