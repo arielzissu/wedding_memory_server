@@ -24,10 +24,9 @@ app.use(cors());
 app.use(express.json());
 // app.use(express.urlencoded({ extended: true }));
 
+app.get("/", (req, res) => res.send("Express on Vercel"));
 app.use("/api", router);
 
-if (process.env.NODE_ENV !== "production") {
-  app.listen(PORT, () =>
-    console.log(`Server running locally on port: ${PORT}`)
-  );
-}
+// if (process.env.NODE_ENV !== "production") {
+app.listen(PORT, () => console.log(`Server running locally on port: ${PORT}`));
+// }
