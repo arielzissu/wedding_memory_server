@@ -4,28 +4,29 @@ import {
   fetchResourcesByUploadCreator,
   getFolderPathByRelevantFolder,
   uploadToCloudinary,
+  exportCloudinaryFolder,
 } from "../utils/cloudinary.js";
 
 export const uploadImages = async (req, res) => {
   const { uploadCreator, relevantFolder } = req.query;
+
   try {
-    const imagePaths = [];
-    for (const file of req.files) {
+    const uploadPromises = req.files.map((file) => {
       const filePath = file.path;
       const fileType = file.mimetype.split("/")[0];
 
-      const result = await uploadToCloudinary(filePath, {
+      return uploadToCloudinary(filePath, {
         folder: getFolderPathByRelevantFolder(relevantFolder),
         tags: [uploadCreator],
         resource_type: fileType,
-      });
-
-      imagePaths.push({
-        url: result.secure_url,
+      }).then((result) => ({
+        url: result.secure_url.replace("/upload/", "/upload/f_auto/"),
         publicId: result.public_id,
         type: result.resource_type,
-      });
-    }
+      }));
+    });
+
+    const imagePaths = await Promise.all(uploadPromises);
 
     res.json({
       message: "Images uploaded successfully!",
@@ -60,15 +61,22 @@ export const getImages = async (req, res) => {
 
     const { images, videos } = allAssets.resources.reduce(
       (acc, asset) => {
+        const optimizedUrl = asset.secure_url.replace(
+          "/upload/",
+          "/upload/f_auto/"
+        );
+        const thumbnailUrl = asset.secure_url.replace(
+          "/upload/",
+          "/upload/w_300,h_200,c_fill,f_auto/"
+        );
+
         const formattedAsset = {
-          url: asset.secure_url,
+          url: optimizedUrl,
           publicId: asset.public_id,
           type: asset.resource_type,
-          thumbnail: asset.secure_url.replace(
-            "/upload/",
-            "/upload/w_300,h_200,c_fill,f_jpg/"
-          ),
+          thumbnail: thumbnailUrl,
         };
+
         if (asset.resource_type === "image") {
           acc.images.push(formattedAsset);
         } else {
@@ -82,7 +90,22 @@ export const getImages = async (req, res) => {
     res.json({ images, videos });
   } catch (error) {
     console.error("Error fetching images from Cloudinary:", error);
-    res.status(500).json({ message: "Error fetching images" });
+    res.status(500).json({ message: "Failed to fetching images" });
+  }
+};
+
+export const downloadFolderAssets = async (req, res) => {
+  const { folderPath } = req.query;
+  const fullPath = getFolderPathByRelevantFolder(folderPath);
+  try {
+    const downloadedAssets = await exportCloudinaryFolder(fullPath);
+    res.json({ downloadedAssets });
+  } catch (error) {
+    console.error(
+      `Error export Cloudinary folder. [fullPath=${fullPath}]`,
+      error
+    );
+    res.status(500).json({ message: "Failed to export Cloudinary folder" });
   }
 };
 

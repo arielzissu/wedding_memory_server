@@ -1,6 +1,10 @@
 import dotenv from "dotenv";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
 import { v2 as cloudinary } from "cloudinary";
+import fs from "fs";
+import axios from "axios";
+import path from "path";
+import os from "os";
 import { SUPPORTED_MEDIA_FORMATS } from "../constants/index.js";
 
 dotenv.config();
@@ -64,4 +68,96 @@ export const fetchResourcesByUploadCreator = async (
 
 export const getFolderPathByRelevantFolder = (relevantFolder) => {
   return `wedding/${relevantFolder}`;
+};
+
+export const fetchAllAssets = async (folderPath, nextCursor = null) => {
+  try {
+    const options = {
+      type: "upload",
+      prefix: folderPath, // Get all assets under the folder
+      max_results: 100, // Max allowed per request
+    };
+    if (nextCursor) options.next_cursor = nextCursor;
+
+    const response = await cloudinary.api.resources(options);
+    return response;
+  } catch (error) {
+    console.error("Error fetching assets: ", error);
+    return null;
+  }
+};
+
+export const downloadFile = async (url, filename, downloadDir) => {
+  try {
+    const safeFilename = path.basename(filename);
+    const filePath = path.resolve(downloadDir, safeFilename);
+
+    console.log(`📥 Downloading: ${url} -> ${filePath}`);
+
+    if (!fs.existsSync(downloadDir)) {
+      fs.mkdirSync(downloadDir, { recursive: true });
+      console.log(`📁 Created directory: ${downloadDir}`);
+    }
+
+    const response = await axios({
+      url,
+      method: "GET",
+      responseType: "stream",
+    });
+
+    if (response.status !== 200) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    const writer = fs.createWriteStream(filePath);
+    response.data.pipe(writer);
+
+    return new Promise((resolve, reject) => {
+      writer.on("finish", () => {
+        console.log(`✅ File saved: ${filePath}`);
+        resolve(filePath);
+      });
+      writer.on("error", (error) => {
+        console.error(`❌ Error writing file: ${filePath}`, error);
+        reject(error);
+      });
+    });
+  } catch (error) {
+    console.error(`❌ Download failed for ${filename}:`, error.message);
+    throw error;
+  }
+};
+
+export const exportCloudinaryFolder = async (folderPath) => {
+  let nextCursor = null;
+  let count = 0;
+
+  const downloadsDir = path.join(os.homedir(), "Downloads");
+  const fullDownloadPath = path.join(downloadsDir, folderPath);
+
+  if (!fs.existsSync(fullDownloadPath)) {
+    fs.mkdirSync(fullDownloadPath, { recursive: true });
+  }
+
+  console.log(`Downloading to: ${fullDownloadPath}`);
+
+  do {
+    const assetsResponse = await fetchAllAssets(folderPath, nextCursor);
+    if (!assetsResponse || !assetsResponse.resources) break;
+
+    const downloadPromises = assetsResponse.resources.map((asset) => {
+      const fileUrl = asset.secure_url;
+      const filename = `${asset.public_id}.${asset.format}`;
+      count++;
+      return downloadFile(fileUrl, filename, fullDownloadPath);
+    });
+
+    await Promise.all(downloadPromises);
+
+    nextCursor = assetsResponse.next_cursor;
+  } while (nextCursor);
+
+  console.log(
+    `✅ Download complete! ${count} files saved in ${fullDownloadPath}`
+  );
 };
