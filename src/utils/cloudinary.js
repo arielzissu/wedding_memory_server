@@ -14,7 +14,6 @@ export const cloudinaryStorage = new CloudinaryStorage({
   cloudinary,
   params: (req, file) => {
     return {
-      // folder: 'wedding/test', // Folder name in Cloudinary
       allowed_formats: [
         "jpg",
         "jpeg",
@@ -24,11 +23,14 @@ export const cloudinaryStorage = new CloudinaryStorage({
         "heic",
         "heif",
         "mp4",
-        "mov",
-        "MOV",
         "avi",
         "3gp",
         "mkv",
+        "MP4",
+        "MOV",
+        "AVI",
+        "3GP",
+        "MKV",
       ],
       resource_type: "auto",
     };
@@ -51,7 +53,13 @@ export const getImagesByTag = async (tag, path, options) => {
 };
 
 export const uploadToCloudinary = async (filePath, options = {}) => {
-  return cloudinary.uploader.upload(filePath, options);
+  return cloudinary.uploader.upload_large(filePath, {
+    chunk_size: 10000000, // 10MB chunks for faster uploads
+    timeout: 600000,
+    use_filename: true, // Keep original file name
+    unique_filename: false, // Don't rename files
+    ...options,
+  });
 };
 
 export const deleteFromCloudinary = async (publicId, resourceType) => {
