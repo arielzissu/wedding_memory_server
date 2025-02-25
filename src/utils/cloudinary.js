@@ -38,7 +38,25 @@ export const cloudinaryStorage = new CloudinaryStorage({
 });
 
 export const getImagesByPath = async (path, options) => {
-  return await cloudinary.api.resources_by_asset_folder(path, options);
+  const response = await cloudinary.api.resources_by_asset_folder(
+    path,
+    options
+  );
+
+  const resourcesWithThumbnails = response.resources.map((resource) => {
+    if (resource.resource_type === "video") {
+      return {
+        ...resource,
+        thumbnail_url: resource.secure_url.replace(
+          "/upload/",
+          "/upload/w_300,h_200,c_fill,f_jpg/"
+        ),
+      };
+    }
+    return resource;
+  });
+
+  return { resources: resourcesWithThumbnails };
 };
 
 export const getImagesByTag = async (tag, path, options) => {
