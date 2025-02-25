@@ -64,6 +64,10 @@ export const getImages = async (req, res) => {
           url: asset.secure_url,
           publicId: asset.public_id,
           type: asset.resource_type,
+          thumbnail: asset.secure_url.replace(
+            "/upload/",
+            "/upload/w_300,h_200,c_fill,f_jpg/"
+          ),
         };
         if (asset.resource_type === "image") {
           acc.images.push(formattedAsset);
