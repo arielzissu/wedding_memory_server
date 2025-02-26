@@ -98,8 +98,8 @@ export const downloadFolderAssets = async (req, res) => {
   const { folderPath } = req.query;
   const fullPath = getFolderPathByRelevantFolder(folderPath);
   try {
-    const downloadedAssets = await exportCloudinaryFolder(fullPath);
-    res.json({ downloadedAssets });
+    const { downloadPath } = await exportCloudinaryFolder(fullPath);
+    res.json({ downloadPath });
   } catch (error) {
     console.error(
       `Error export Cloudinary folder. [fullPath=${fullPath}]`,

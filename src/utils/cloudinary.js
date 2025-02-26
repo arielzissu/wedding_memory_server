@@ -70,21 +70,43 @@ export const getFolderPathByRelevantFolder = (relevantFolder) => {
   return `wedding/${relevantFolder}`;
 };
 
-export const fetchAllAssets = async (folderPath, nextCursor = null) => {
+const fetchCloudinaryResources = async (
+  folderPath,
+  resourceType,
+  nextCursor = null
+) => {
   try {
     const options = {
       type: "upload",
-      prefix: folderPath, // Get all assets under the folder
-      max_results: 100, // Max allowed per request
+      prefix: folderPath,
+      max_results: 100,
+      resource_type: resourceType,
     };
+
     if (nextCursor) options.next_cursor = nextCursor;
 
     const response = await cloudinary.api.resources(options);
+    console.log(`Fetched ${resourceType}:`, response);
     return response;
   } catch (error) {
-    console.error("Error fetching assets: ", error);
-    return null;
+    console.error(`❌ Error fetching ${resourceType}:`, error);
   }
+};
+
+export const fetchAllAssets = async (folderPath, nextCursor = null) => {
+  const images = await fetchCloudinaryResources(
+    folderPath,
+    "image",
+    nextCursor
+  );
+  const videos = await fetchCloudinaryResources(
+    folderPath,
+    "video",
+    nextCursor
+  );
+  const combineNextCursor = images.next_cursor || videos.next_cursor || null;
+  const combineResources = [...images.resources, ...videos.resources];
+  return { resources: combineResources, next_cursor: combineNextCursor };
 };
 
 export const downloadFile = async (url, filename, downloadDir) => {
@@ -160,4 +182,6 @@ export const exportCloudinaryFolder = async (folderPath) => {
   console.log(
     `✅ Download complete! ${count} files saved in ${fullDownloadPath}`
   );
+
+  return { success: true, downloadPath: fullDownloadPath };
 };
