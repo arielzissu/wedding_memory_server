@@ -65,10 +65,9 @@ export const getImages = async (req, res) => {
           "/upload/",
           "/upload/f_auto/"
         );
-        const thumbnailUrl = asset.secure_url.replace(
-          "/upload/",
-          "/upload/w_300,h_200,c_fill,f_auto/"
-        );
+        const thumbnailUrl = asset.secure_url
+          .replace("/upload/", "/upload/w_300,h_200,c_fill,f_auto/")
+          .replace(/\.[^/.]+$/, ".jpg");
 
         const formattedAsset = {
           url: optimizedUrl,
