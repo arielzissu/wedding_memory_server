@@ -49,6 +49,7 @@ export const uploadToCloudinary = async (filePath, options = {}) => {
     timeout: 600000,
     use_filename: true, // Keep original file name
     unique_filename: false, // Don't rename files
+    tags: true,
     ...options,
   });
 };

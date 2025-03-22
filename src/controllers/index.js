@@ -23,6 +23,7 @@ export const uploadImages = async (req, res) => {
         url: result.secure_url.replace("/upload/", "/upload/f_auto/"),
         publicId: result.public_id,
         type: result.resource_type,
+        tags: [uploadCreator],
       }));
     });
 
@@ -38,7 +39,7 @@ export const uploadImages = async (req, res) => {
   }
 };
 
-export const getImages = async (req, res) => {
+export const getPhotos = async (req, res) => {
   const { uploadCreator, relevantFolder } = req.query;
   const fullPath = getFolderPathByRelevantFolder(relevantFolder);
   try {
@@ -109,7 +110,7 @@ export const downloadFolderAssets = async (req, res) => {
   }
 };
 
-export const deleteImage = async (req, res) => {
+export const deletePhoto = async (req, res) => {
   try {
     const { publicId, resourceType } = req.body;
     await deleteFromCloudinary(publicId, resourceType);
