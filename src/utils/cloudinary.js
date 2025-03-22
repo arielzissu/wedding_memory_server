@@ -26,7 +26,10 @@ export const cloudinaryStorage = new CloudinaryStorage({
 });
 
 export const getImagesByPath = async (path, options) => {
-  return await cloudinary.api.resources_by_asset_folder(path, options);
+  return await cloudinary.api.resources_by_asset_folder(path, {
+    ...options,
+    tags: true,
+  });
 };
 
 export const getImagesByTag = async (tag, path, options) => {

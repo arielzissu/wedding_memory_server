@@ -74,6 +74,7 @@ export const getImages = async (req, res) => {
           publicId: asset.public_id,
           type: asset.resource_type,
           thumbnail: thumbnailUrl,
+          tags: asset.tags,
         };
 
         if (asset.resource_type === "image") {
