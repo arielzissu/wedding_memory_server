@@ -1,8 +1,8 @@
 import * as express from "express";
-import cloudinaryRoutes from "./cloudinary.js";
+import telegramStorageRoutes from "./telegramStorage.js";
 
 const router = express.Router();
 
-router.use("/cloudinary", cloudinaryRoutes);
+router.use("/telegram-storage", telegramStorageRoutes);
 
 export default router;

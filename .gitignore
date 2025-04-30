@@ -26,3 +26,7 @@ Thumbs.db
 # Temporary files
 tmp/
 temp/
+src/uploads
+/uploads
+tokens.json
+telegramMedia.json
