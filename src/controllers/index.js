@@ -132,14 +132,11 @@ export const downloadFolderAssets = async (req, res) => {
         .json({ message: "No media found for this folder" });
     }
 
-    const TelegramBot = (await import("node-telegram-bot-api")).default;
-    const bot = new TelegramBot(process.env.TELEGRAM_TOKEN, { polling: false });
-
     const downloadPaths = [];
 
     for (const media of matchedMedia) {
-      const { file_path } = await bot.getFile(media.fileId);
-      const fileUrl = `https://api.telegram.org/file/bot${bot.token}/${file_path}`;
+      const { file_path } = await getFileByFileId(media.fileId);
+      const fileUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_TOKEN}/${file_path}`;
       const fileName = `${media.messageId}_${media.fileType}_${media.fileName}`;
       const destPath = path.join(DOWNLOAD_BASE_DIR, folderPath, fileName);
 
@@ -168,7 +165,9 @@ const deletePhotoFromDb = (messageId, userEmail) => {
     ? JSON.parse(fs.readFileSync(DB_PATH, "utf-8"))
     : [];
 
-  const mediaItem = mediaList.find((item) => item.messageId === messageId && item.uploadCreator === userEmail);
+  const mediaItem = mediaList.find(
+    (item) => item.messageId === messageId && item.uploadCreator === userEmail
+  );
 
   if (!mediaItem) {
     return { success: false, message: "Photo not found" };

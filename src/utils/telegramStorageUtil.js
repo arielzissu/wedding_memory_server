@@ -12,7 +12,11 @@ if (!TELEGRAM_TOKEN) {
   throw new Error("Missing TELEGRAM_TOKEN in environment");
 }
 
-const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
+// const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
+const bot = new TelegramBot(TELEGRAM_TOKEN, {
+  webHook: true,
+});
+bot.setWebHook(`${process.env.VERCEL_URL}/bot${TELEGRAM_TOKEN}`);
 
 export const getFileByFileId = async (telegramFileId) => {
   if (!telegramFileId) return null;
@@ -20,11 +24,28 @@ export const getFileByFileId = async (telegramFileId) => {
   return telegramFile;
 };
 
+// export const getThumbUrl = async (videoFileId) => {
+//   if (!videoFileId) return null;
+//   const { file_path } = await getFileByFileId(videoFileId);
+//   const thumbUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_TOKEN}/${file_path}`;
+//   return thumbUrl;
+// };
+
 export const getThumbUrl = async (videoFileId) => {
   if (!videoFileId) return null;
   const { file_path } = await getFileByFileId(videoFileId);
   const thumbUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_TOKEN}/${file_path}`;
-  return thumbUrl;
+
+  // Download the file and save it locally or to cloud storage
+  const localPath = `./uploads/${file_path.split("/").pop()}`;
+  const response = await axios({
+    url: thumbUrl,
+    method: "GET",
+    responseType: "stream",
+  });
+  response.data.pipe(fs.createWriteStream(localPath));
+
+  return localPath; // Return the local or cloud storage path
 };
 
 // Upload a single file (image/video)
