@@ -9,14 +9,23 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("UNHANDLED REJECTION:", reason);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("UNCAUGHT EXCEPTION:", err);
+});
+
 app.use(
   cors({
-    origin: [
-      "https://wedding-memory-client.vercel.app",
-      "http://localhost:3000",
-    ],
+    origin: "*",
+    // origin: [
+    //   "https://wedding-memory-client.vercel.app",
+    //   "http://localhost:3000",
+    // ],
     methods: ["GET", "POST", "DELETE"],
-    // credentials: true,
+    credentials: false,
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
