@@ -2,21 +2,22 @@ import path from "path";
 import fs from "fs";
 import TelegramBot from "node-telegram-bot-api";
 import dotenv from "dotenv";
+import axios from "axios";
 
 dotenv.config();
 
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
-// if (!TELEGRAM_TOKEN) {
-//   throw new Error("Missing TELEGRAM_TOKEN in environment");
-// }
+if (!TELEGRAM_TOKEN) {
+  throw new Error("Missing TELEGRAM_TOKEN in environment");
+}
 
 // const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
-// const bot = new TelegramBot(TELEGRAM_TOKEN, {
-//   webHook: true,
-// });
-// bot.setWebHook(`${process.env.VERCEL_URL}/bot${TELEGRAM_TOKEN}`);
+const bot = new TelegramBot(TELEGRAM_TOKEN, {
+  webHook: true,
+});
+bot.setWebHook(`${process.env.VERCEL_URL}/bot${TELEGRAM_TOKEN}`);
 
 export const getFileByFileId = async (telegramFileId) => {
   if (!telegramFileId) return null;
@@ -31,21 +32,45 @@ export const getFileByFileId = async (telegramFileId) => {
 //   return thumbUrl;
 // };
 
+// export const getThumbUrl = async (videoFileId) => {
+//   if (!videoFileId) return null;
+//   const { file_path } = await getFileByFileId(videoFileId);
+//   const thumbUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_TOKEN}/${file_path}`;
+
+//   // Download the file and save it locally or to cloud storage
+//   const localPath = `./uploads/${file_path.split("/").pop()}`;
+//   const response = await axios({
+//     url: thumbUrl,
+//     method: "GET",
+//     responseType: "stream",
+//   });
+//   response.data.pipe(fs.createWriteStream(localPath));
+
+//   return localPath; // Return the local or cloud storage path
+// };
+
 export const getThumbUrl = async (videoFileId) => {
   if (!videoFileId) return null;
+
   const { file_path } = await getFileByFileId(videoFileId);
+  console.log("file_path: ", file_path);
   const thumbUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_TOKEN}/${file_path}`;
 
-  // Download the file and save it locally or to cloud storage
-  const localPath = `./uploads/${file_path.split("/").pop()}`;
   const response = await axios({
     url: thumbUrl,
     method: "GET",
-    responseType: "stream",
+    responseType: "arraybuffer", // gets binary buffer
   });
-  response.data.pipe(fs.createWriteStream(localPath));
 
-  return localPath; // Return the local or cloud storage path
+  console.log("response: ", response);
+
+  const buffer = Buffer.from(response.data);
+
+  // Instead of returning a local path, return the buffer and filename
+  return {
+    filename: file_path.split("/").pop(),
+    buffer,
+  };
 };
 
 // Upload a single file (image/video)

@@ -85,34 +85,34 @@ export const uploadImages = async (req, res) => {
 
 // ✅ List all stored media
 export const getPhotos = async (req, res) => {
-  return res.json([])
-  // try {
-  //   if (!fs.existsSync(DB_PATH)) return res.json([]);
+  // return res.json([])
+  try {
+    if (!fs.existsSync(DB_PATH)) return res.json([]);
 
-  //   const rawData = fs.readFileSync(DB_PATH, "utf-8");
-  //   const storedMedia = JSON.parse(rawData);
+    const rawData = fs.readFileSync(DB_PATH, "utf-8");
+    const storedMedia = JSON.parse(rawData);
 
-  //   const formatted = await Promise.all(
-  //     storedMedia.map(async (item) => {
-  //       const { file_path } = await getFileByFileId(item.fileId);
-  //       return {
-  //         fileId: item.fileId,
-  //         publicId: item.fileId,
-  //         type: item.type,
-  //         caption: item.caption || "",
-  //         messageId: item.messageId,
-  //         uploadCreator: item.uploadCreator,
-  //         thumbnail: item.thumbnail,
-  //         url: `https://api.telegram.org/file/bot${process.env.TELEGRAM_TOKEN}/${file_path}`,
-  //       };
-  //     })
-  //   );
+    const formatted = await Promise.all(
+      storedMedia.map(async (item) => {
+        const { file_path } = await getFileByFileId(item.fileId);
+        return {
+          fileId: item.fileId,
+          publicId: item.fileId,
+          type: item.type,
+          caption: item.caption || "",
+          messageId: item.messageId,
+          uploadCreator: item.uploadCreator,
+          thumbnail: item.thumbnail,
+          url: `https://api.telegram.org/file/bot${process.env.TELEGRAM_TOKEN}/${file_path}`,
+        };
+      })
+    );
 
-  //   res.json(formatted.filter(Boolean));
-  // } catch (error) {
-  //   console.error("Error fetching Telegram-stored media:", error);
-  //   res.status(500).json({ message: "Failed to fetch photos" });
-  // }
+    res.json(formatted.filter(Boolean));
+  } catch (error) {
+    console.error("Error fetching Telegram-stored media:", error);
+    res.status(500).json({ message: "Failed to fetch photos" });
+  }
 };
 
 export const downloadFolderAssets = async (req, res) => {
