@@ -13,11 +13,11 @@ if (!TELEGRAM_TOKEN) {
   throw new Error("Missing TELEGRAM_TOKEN in environment");
 }
 
-// const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
-const bot = new TelegramBot(TELEGRAM_TOKEN, {
-  webHook: true,
-});
-bot.setWebHook(`${process.env.VERCEL_URL}/bot${TELEGRAM_TOKEN}`);
+const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
+// const bot = new TelegramBot(TELEGRAM_TOKEN, {
+//   webHook: true,
+// });
+// bot.setWebHook(`${process.env.VERCEL_URL}/bot${TELEGRAM_TOKEN}`);
 
 export const getFileByFileId = async (telegramFileId) => {
   if (!telegramFileId) return null;
