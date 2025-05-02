@@ -2,6 +2,8 @@ import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
 import axios from "axios";
+import FormData from "form-data";
+import Media from "../models/telegramStorage.js";
 import {
   uploadMedia,
   uploadDirectory,
@@ -12,8 +14,8 @@ import {
 
 dotenv.config();
 
-const DB_PATH = path.join(process.cwd(), "telegramMedia.json");
-const DOWNLOAD_BASE_DIR = path.join(process.cwd(), "downloads");
+// const DB_PATH = path.join(process.cwd(), "telegramMedia.json");
+// const DOWNLOAD_BASE_DIR = path.join(process.cwd(), "downloads");
 
 const saveMediaToDb = (data) => {
   let existing = [];
@@ -24,94 +26,207 @@ const saveMediaToDb = (data) => {
   fs.writeFileSync(DB_PATH, JSON.stringify(existing, null, 2));
 };
 
+// export const uploadImages = async (req, res) => {
+//   try {
+//     const { uploadCreator, relevantFolder } = req.query;
+//     const uploadResults = [];
+
+//     if (req.files && req.files.length > 0) {
+//       await Promise.all(
+//         req.files.map(async (file) => {
+//           console.log('file: ', file);
+//           const filePath = file.path;
+//           const fileType = file.mimetype.startsWith("video")
+//             ? "video"
+//             : "image";
+
+//           const telegramRes = await uploadMedia(
+//             filePath,
+//             fileType,
+//             file.originalname
+//           );
+//           fs.unlinkSync(filePath);
+
+//           const fileId =
+//             telegramRes.photo?.at(-1)?.file_id ||
+//             telegramRes.video?.file_id ||
+//             telegramRes.document?.file_id;
+
+//           const thumbnailUrl = await getThumbUrl(
+//             telegramRes?.video?.thumb?.file_id
+//           );
+
+//           const { file_path } = await getFileByFileId(fileId);
+
+//           uploadResults.push({
+//             fileId,
+//             publicId: fileId,
+//             type: fileType,
+//             caption: telegramRes.caption,
+//             messageId: telegramRes.message_id,
+//             uploadCreator,
+//             thumbnail: thumbnailUrl,
+//             url: `https://api.telegram.org/file/bot${process.env.TELEGRAM_TOKEN}/${file_path}`,
+//           });
+//         })
+//       );
+
+//       saveMediaToDb(uploadResults);
+//     }
+
+//     // if (folderPath && fs.existsSync(folderPath)) {
+//     //   await uploadDirectory(folderPath, bulkType || "image");
+//     //   uploadResults.push({ bulkUpload: true, folderPath });
+//     // }
+
+//     res.json(uploadResults);
+//   } catch (err) {
+//     console.error("Telegram upload error:", err);
+//     res.status(500).send("Upload to Telegram failed");
+//   }
+// };
+
+// export const uploadImages = async (req, res) => {
+//   try {
+//     const { uploadCreator, relevantFolder } = req.query;
+
+//     const uploadResults = await Promise.all(
+//       req.files.map(async (file) => {
+//         const telegramRes = await axios.post(
+//           `https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/sendPhoto`,
+//           {
+//             chat_id: process.env.TELEGRAM_CHAT_ID,
+//             photo: file.buffer,
+//             caption: file.originalname,
+//           },
+//           {
+//             headers: {
+//               "Content-Type": "multipart/form-data",
+//             },
+//           }
+//         );
+
+//         const messageId = telegramRes.data.result.message_id;
+//         const fileId = telegramRes.data.result.photo.at(-1).file_id;
+
+//         const mediaItem = new Media({
+//           fileId,
+//           publicId: fileId,
+//           type: "image",
+//           caption: file.originalname,
+//           messageId,
+//           uploadCreator,
+//           thumbnail: null,
+//           url: `https://api.telegram.org/file/bot${process.env.TELEGRAM_TOKEN}/${fileId}`,
+//           folder: relevantFolder,
+//         });
+
+//         await mediaItem.save();
+//         return mediaItem;
+//       })
+//     );
+
+//     res.status(200).json({ message: "Uploaded successfully", uploadResults });
+//   } catch (error) {
+//     console.error("Upload failed:", error);
+//     res.status(500).json({ error: "Upload failed" });
+//   }
+// };
+
 export const uploadImages = async (req, res) => {
   try {
     const { uploadCreator, relevantFolder } = req.query;
-    const uploadResults = [];
 
-    if (req.files && req.files.length > 0) {
-      await Promise.all(
-        req.files.map(async (file) => {
-          const filePath = file.path;
-          const fileType = file.mimetype.startsWith("video")
-            ? "video"
-            : "image";
+    const uploadResults = await Promise.all(
+      req.files.map(async (file) => {
+        const form = new FormData();
+        form.append("chat_id", process.env.TELEGRAM_CHAT_ID);
+        form.append("caption", file.originalname);
+        form.append("photo", file.buffer, {
+          filename: file.originalname,
+          contentType: file.mimetype,
+        });
 
-          const telegramRes = await uploadMedia(
-            filePath,
-            fileType,
-            file.originalname
-          );
-          fs.unlinkSync(filePath);
+        const telegramRes = await axios.post(
+          `https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/sendPhoto`,
+          form,
+          {
+            headers: form.getHeaders(),
+          }
+        );
 
-          const fileId =
-            telegramRes.photo?.at(-1)?.file_id ||
-            telegramRes.video?.file_id ||
-            telegramRes.document?.file_id;
+        const messageId = telegramRes.data.result.message_id;
+        const fileId = telegramRes.data.result.photo.at(-1).file_id;
 
-          const thumbnailUrl = await getThumbUrl(
-            telegramRes?.video?.thumb?.file_id
-          );
+        const { file_path } = await getFileByFileId(fileId);
 
-          const { file_path } = await getFileByFileId(fileId);
+        const mediaItem = new Media({
+          fileId,
+          publicId: fileId,
+          type: "image",
+          caption: file.originalname,
+          messageId,
+          uploadCreator,
+          thumbnail: null,
+          url: `https://api.telegram.org/file/bot${process.env.TELEGRAM_TOKEN}/${file_path}`,
+          folder: relevantFolder,
+        });
 
-          uploadResults.push({
-            fileId,
-            publicId: fileId,
-            type: fileType,
-            caption: telegramRes.caption,
-            messageId: telegramRes.message_id,
-            uploadCreator,
-            thumbnail: thumbnailUrl,
-            url: `https://api.telegram.org/file/bot${process.env.TELEGRAM_TOKEN}/${file_path}`,
-          });
-        })
-      );
+        await mediaItem.save();
+        return mediaItem;
+      })
+    );
 
-      saveMediaToDb(uploadResults);
-    }
-
-    // if (folderPath && fs.existsSync(folderPath)) {
-    //   await uploadDirectory(folderPath, bulkType || "image");
-    //   uploadResults.push({ bulkUpload: true, folderPath });
-    // }
-
-    res.json(uploadResults);
-  } catch (err) {
-    console.error("Telegram upload error:", err);
-    res.status(500).send("Upload to Telegram failed");
+    res.status(200).json({ message: "Uploaded successfully", uploadResults });
+  } catch (error) {
+    console.error("Upload failed:", error.response?.data || error.message);
+    res.status(500).json({ error: "Upload failed" });
   }
 };
 
 // ✅ List all stored media
+// export const getPhotos = async (req, res) => {
+//   return res.json([]);
+//   // try {
+//   //   if (!fs.existsSync(DB_PATH)) return res.json([]);
+
+//   //   const rawData = fs.readFileSync(DB_PATH, "utf-8");
+//   //   const storedMedia = JSON.parse(rawData);
+
+//   //   const formatted = await Promise.all(
+//   //     storedMedia.map(async (item) => {
+//   //       const { file_path } = await getFileByFileId(item.fileId);
+//   //       return {
+//   //         fileId: item.fileId,
+//   //         publicId: item.fileId,
+//   //         type: item.type,
+//   //         caption: item.caption || "",
+//   //         messageId: item.messageId,
+//   //         uploadCreator: item.uploadCreator,
+//   //         thumbnail: item.thumbnail,
+//   //         url: `https://api.telegram.org/file/bot${process.env.TELEGRAM_TOKEN}/${file_path}`,
+//   //       };
+//   //     })
+//   //   );
+
+//   //   res.json(formatted.filter(Boolean));
+//   // } catch (error) {
+//   //   console.error("Error fetching Telegram-stored media:", error);
+//   //   res.status(500).json({ message: "Failed to fetch photos" });
+//   // }
+// };
+
 export const getPhotos = async (req, res) => {
-  // return res.json([])
   try {
-    if (!fs.existsSync(DB_PATH)) return res.json([]);
+    const { relevantFolder } = req.query;
 
-    const rawData = fs.readFileSync(DB_PATH, "utf-8");
-    const storedMedia = JSON.parse(rawData);
+    const filter = relevantFolder ? { folder: relevantFolder } : {};
+    const media = await Media.find(filter).sort({ createdAt: -1 });
 
-    const formatted = await Promise.all(
-      storedMedia.map(async (item) => {
-        const { file_path } = await getFileByFileId(item.fileId);
-        return {
-          fileId: item.fileId,
-          publicId: item.fileId,
-          type: item.type,
-          caption: item.caption || "",
-          messageId: item.messageId,
-          uploadCreator: item.uploadCreator,
-          thumbnail: item.thumbnail,
-          url: `https://api.telegram.org/file/bot${process.env.TELEGRAM_TOKEN}/${file_path}`,
-        };
-      })
-    );
-
-    res.json(formatted.filter(Boolean));
-  } catch (error) {
-    console.error("Error fetching Telegram-stored media:", error);
-    res.status(500).json({ message: "Failed to fetch photos" });
+    res.json(media);
+  } catch (err) {
+    console.error("Error getting photos:", err);
+    res.status(500).json({ message: "Failed to get photos" });
   }
 };
 
@@ -182,24 +297,53 @@ const deletePhotoFromDb = (messageId, userEmail) => {
   return { success: true };
 };
 
+// export const deletePhoto = async (req, res) => {
+//   try {
+//     const { messageId, userEmail } = req.body;
+//     if (!messageId) {
+//       return res.status(400).json({ message: "Message ID is required" });
+//     }
+//     const { success, message } = deletePhotoFromDb(messageId, userEmail);
+//     if (!success) {
+//       return res.status(404).json({ message });
+//     }
+//     const isDeleted = await deleteMediaByMessage(messageId);
+//     res.json({
+//       success: true,
+//       isDeleted,
+//       message: "Image has been deleted successfully",
+//     });
+//   } catch (error) {
+//     console.error("Error deleting image from Telegram bot:", error);
+//     res.status(500).json({ message: "Error deleting image" });
+//   }
+// };
+
 export const deletePhoto = async (req, res) => {
   try {
     const { messageId, userEmail } = req.body;
-    if (!messageId) {
-      return res.status(400).json({ message: "Message ID is required" });
-    }
-    const { success, message } = deletePhotoFromDb(messageId, userEmail);
-    if (!success) {
-      return res.status(404).json({ message });
-    }
-    const isDeleted = await deleteMediaByMessage(messageId);
-    res.json({
-      success: true,
-      isDeleted,
-      message: "Image has been deleted successfully",
+
+    const media = await Media.findOneAndDelete({
+      messageId,
+      uploadCreator: userEmail,
     });
+
+    if (!media) {
+      return res.status(404).json({ message: "Photo not found" });
+    }
+
+    // Delete from Telegram
+    await axios.post(
+      `https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/deleteMessage`,
+      {
+        chat_id: process.env.TELEGRAM_CHAT_ID,
+        message_id: messageId,
+      }
+    );
+
+    res.json({ success: true, message: "Photo deleted" });
   } catch (error) {
-    console.error("Error deleting image from Telegram bot:", error);
-    res.status(500).json({ message: "Error deleting image" });
+    console.error("Error deleting photo:", error);
+    res.status(500).json({ message: "Failed to delete photo" });
   }
 };
