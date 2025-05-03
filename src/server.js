@@ -19,13 +19,13 @@ process.on("uncaughtException", (err) => {
 
 app.use(
   cors({
-    origin: "*",
-    // origin: [
-    //   "https://wedding-memory-client.vercel.app",
-    //   "http://localhost:3000",
-    // ],
+    // origin: "*",
+    origin: [
+      "https://wedding-memory-client.vercel.app",
+      "http://localhost:3000",
+    ],
     methods: ["GET", "POST", "DELETE"],
-    credentials: false,
+    // credentials: false,
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
@@ -41,16 +41,8 @@ mongoose
   .then(() => console.log("✅ Connected to MongoDB"))
   .catch((err) => console.error("❌ MongoDB connection error:", err));
 
-app.get("/", (req, res) => res.send("Express on Vercel"));
+app.get("/", (_req, res) => res.send("Express on Vercel"));
 app.use("/api", router);
-
-app.get("/api/files", async (req, res) => {
-  const response = await drive.files.list({
-    q: `${FOLDER_ID} in parents and trashed = false`,
-    fields: "files(id, name, mimeType, webViewLink, thumbnailLink)",
-  });
-  res.json(response.data.files);
-});
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

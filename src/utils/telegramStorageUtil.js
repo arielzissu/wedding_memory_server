@@ -1,8 +1,8 @@
-import path from "path";
 import fs from "fs";
 import TelegramBot from "node-telegram-bot-api";
 import dotenv from "dotenv";
 import axios from "axios";
+import FormData from "form-data";
 
 dotenv.config();
 
@@ -14,10 +14,6 @@ if (!TELEGRAM_TOKEN) {
 }
 
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
-// const bot = new TelegramBot(TELEGRAM_TOKEN, {
-//   webHook: true,
-// });
-// bot.setWebHook(`${process.env.VERCEL_URL}/bot${TELEGRAM_TOKEN}`);
 
 export const getFileByFileId = async (telegramFileId) => {
   if (!telegramFileId) return null;
@@ -25,88 +21,49 @@ export const getFileByFileId = async (telegramFileId) => {
   return telegramFile;
 };
 
-// export const getThumbUrl = async (videoFileId) => {
-//   if (!videoFileId) return null;
-//   const { file_path } = await getFileByFileId(videoFileId);
-//   const thumbUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_TOKEN}/${file_path}`;
-//   return thumbUrl;
-// };
-
-// export const getThumbUrl = async (videoFileId) => {
-//   if (!videoFileId) return null;
-//   const { file_path } = await getFileByFileId(videoFileId);
-//   const thumbUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_TOKEN}/${file_path}`;
-
-//   // Download the file and save it locally or to cloud storage
-//   const localPath = `./uploads/${file_path.split("/").pop()}`;
-//   const response = await axios({
-//     url: thumbUrl,
-//     method: "GET",
-//     responseType: "stream",
-//   });
-//   response.data.pipe(fs.createWriteStream(localPath));
-
-//   return localPath; // Return the local or cloud storage path
-// };
-
 export const getThumbUrl = async (videoFileId) => {
   if (!videoFileId) return null;
-
   const { file_path } = await getFileByFileId(videoFileId);
-  console.log("file_path: ", file_path);
   const thumbUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_TOKEN}/${file_path}`;
+  return thumbUrl;
 
-  const response = await axios({
-    url: thumbUrl,
-    method: "GET",
-    responseType: "arraybuffer", // gets binary buffer
-  });
+  // const response = await axios({
+  //   url: thumbUrl,
+  //   method: "GET",
+  //   responseType: "arraybuffer",
+  // });
 
-  console.log("response: ", response);
+  // const buffer = Buffer.from(response.data);
 
-  const buffer = Buffer.from(response.data);
-
-  // Instead of returning a local path, return the buffer and filename
-  return {
-    filename: file_path.split("/").pop(),
-    buffer,
-  };
+  // return {
+  //   filename: file_path.split("/").pop(),
+  //   buffer,
+  // };
 };
 
-// Upload a single file (image/video)
-export const uploadMedia = async (filePath, type = "image", caption = "") => {
-  const method = type === "image" ? bot.sendPhoto : bot.sendVideo;
-  return await method.call(bot, CHAT_ID, fs.createReadStream(filePath), {
-    caption,
+export const uploadTelegramMedia = async ({
+  buffer,
+  fileName,
+  mimeType,
+  type = "photo",
+  caption = "",
+}) => {
+  const form = new FormData();
+  form.append("chat_id", process.env.TELEGRAM_CHAT_ID);
+  form.append("caption", caption);
+  form.append(type, buffer, {
+    filename: fileName,
+    contentType: mimeType,
   });
-};
 
-// Upload all files in a directory (bulk)
-export const uploadDirectory = async (dirPath, type = "image") => {
-  let uploadResults = [];
-  const files = fs.readdirSync(dirPath).filter((f) => !f.startsWith("."));
-  for (const file of files) {
-    const fullPath = path.join(dirPath, file);
-    const resUploadMedia = await uploadMedia(
-      fullPath,
-      type,
-      `Uploaded: ${file}`
-    );
+  const fileTypeUrl = type[0].toUpperCase() + type.slice(1);
+  const telegramUrl = `https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/send${fileTypeUrl}`;
 
-    uploadResults.push({
-      fileId,
-      filePath,
-      fileName: file.originalname,
-      messageId: resUploadMedia.message_id,
-      fileType,
-      caption: resUploadMedia.caption,
-      folderPath: req.body.folderPath || "default",
-      uploadCreator,
-      thumbnail: thumbnailUrl,
-    });
-  }
+  const response = await axios.post(telegramUrl, form, {
+    headers: form.getHeaders(),
+  });
 
-  return uploadResults;
+  return response.data;
 };
 
 export const downloadFile = async (fileId, downloadPath) => {
@@ -131,7 +88,6 @@ export const downloadFile = async (fileId, downloadPath) => {
 export const deleteMediaByMessage = async (messageId) => {
   try {
     const isDeleted = await bot.deleteMessage(CHAT_ID, messageId);
-    console.log(`Deleted message ${messageId} successfully`);
     return isDeleted;
   } catch (err) {
     console.error("Failed to delete message:", err);
