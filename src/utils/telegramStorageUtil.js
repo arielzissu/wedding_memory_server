@@ -3,6 +3,7 @@ import TelegramBot from "node-telegram-bot-api";
 import dotenv from "dotenv";
 import axios from "axios";
 import FormData from "form-data";
+import { extractVideoThumbnail } from "../utils/photos.js";
 
 dotenv.config();
 
@@ -26,19 +27,6 @@ export const getThumbUrl = async (videoFileId) => {
   const { file_path } = await getFileByFileId(videoFileId);
   const thumbUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_TOKEN}/${file_path}`;
   return thumbUrl;
-
-  // const response = await axios({
-  //   url: thumbUrl,
-  //   method: "GET",
-  //   responseType: "arraybuffer",
-  // });
-
-  // const buffer = Buffer.from(response.data);
-
-  // return {
-  //   filename: file_path.split("/").pop(),
-  //   buffer,
-  // };
 };
 
 export const uploadTelegramMedia = async ({
@@ -51,13 +39,39 @@ export const uploadTelegramMedia = async ({
   const form = new FormData();
   form.append("chat_id", process.env.TELEGRAM_CHAT_ID);
   form.append("caption", caption);
-  form.append(type, buffer, {
+
+  if (type === "video") {
+    const { thumbPath, cleanup } = await extractVideoThumbnail(
+      buffer,
+      fileName
+    );
+
+    console.log("thumbPath: ", thumbPath);
+
+    form.append("video", buffer, {
+      filename: fileName,
+      contentType: mimeType,
+    });
+
+    form.append("thumb", fs.createReadStream(thumbPath));
+
+    const telegramUrl = `https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/sendVideo`;
+
+    const response = await axios.post(telegramUrl, form, {
+      headers: form.getHeaders(),
+    });
+
+    cleanup();
+    return response.data;
+  }
+
+  // Fallback for photos
+  form.append("photo", buffer, {
     filename: fileName,
     contentType: mimeType,
   });
 
-  const fileTypeUrl = type[0].toUpperCase() + type.slice(1);
-  const telegramUrl = `https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/send${fileTypeUrl}`;
+  const telegramUrl = `https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/sendPhoto`;
 
   const response = await axios.post(telegramUrl, form, {
     headers: form.getHeaders(),

@@ -23,11 +23,14 @@
         "@routes": "src/routes"
     },
     "dependencies": {
+        "@ffmpeg-installer/ffmpeg": "^1.1.0",
+        "@ffprobe-installer/ffprobe": "^2.1.2",
         "axios": "^1.7.9",
         "cloudinary": "^1.41.3",
         "cors": "^2.8.5",
         "dotenv": "^16.4.7",
         "express": "^4.21.2",
+        "fluent-ffmpeg": "^2.1.3",
         "form-data": "^4.0.2",
         "fs": "^0.0.1-security",
         "jwt-decode": "^4.0.0",

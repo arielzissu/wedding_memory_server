@@ -15,14 +15,13 @@ export const uploadImages = async (req, res) => {
 
     const uploadResults = await Promise.all(
       req.files.map(async (file) => {
-        const type = file.mimetype.startsWith("video") ? "video" : "photo";
-        const isVideoType = type === "video";
+        const isVideoType = file.mimetype.startsWith("video");
 
         const telegramRes = await uploadTelegramMedia({
           buffer: file.buffer,
           fileName: file.originalname,
           mimeType: file.mimetype,
-          type,
+          type: isVideoType ? "video" : "photo",
           caption: file.originalname,
         });
 
@@ -39,13 +38,13 @@ export const uploadImages = async (req, res) => {
         const { file_path } = await getFileByFileId(fileId);
 
         const thumbnailUrl = isVideoType
-          ? await getThumbUrl(telegramRes.result.video?.file_id)
+          ? await getThumbUrl(telegramRes.result.video?.thumb?.file_id)
           : null;
 
         const mediaItem = new Media({
           fileId,
           publicId: fileId,
-          type,
+          type: isVideoType ? "video" : "photo",
           caption: file.originalname,
           messageId,
           uploadCreator,
