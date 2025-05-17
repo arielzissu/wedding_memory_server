@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import mongoose from "mongoose";
 import router from "./routes/index.js";
+import { loadModels } from "./utils/faceDetection.js";
 
 dotenv.config();
 
@@ -19,13 +20,11 @@ process.on("uncaughtException", (err) => {
 
 app.use(
   cors({
-    // origin: "*",
     origin: [
       "https://wedding-memory-client.vercel.app",
       "http://localhost:3000",
     ],
     methods: ["GET", "POST", "DELETE"],
-    // credentials: false,
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
@@ -44,6 +43,17 @@ mongoose
 app.get("/", (_req, res) => res.send("Express on Vercel"));
 app.use("/api", router);
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+(async () => {
+  try {
+    await loadModels();
+    console.log("Face models loaded ✅");
+
+    // Then start the server
+    app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+    });
+  } catch (err) {
+    console.error("Failed to load face models ❌", err);
+    process.exit(1);
+  }
+})();

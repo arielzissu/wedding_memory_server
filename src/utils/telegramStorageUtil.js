@@ -45,24 +45,25 @@ export const uploadTelegramMedia = async ({
       buffer,
       fileName
     );
+    try {
+      form.append("video", buffer, {
+        filename: fileName,
+        contentType: mimeType,
+      });
 
-    console.log("thumbPath: ", thumbPath);
+      form.append("thumb", fs.createReadStream(thumbPath));
 
-    form.append("video", buffer, {
-      filename: fileName,
-      contentType: mimeType,
-    });
+      const telegramUrl = `https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/sendVideo`;
 
-    form.append("thumb", fs.createReadStream(thumbPath));
+      const response = await axios.post(telegramUrl, form, {
+        headers: form.getHeaders(),
+      });
 
-    const telegramUrl = `https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/sendVideo`;
-
-    const response = await axios.post(telegramUrl, form, {
-      headers: form.getHeaders(),
-    });
-
-    cleanup();
-    return response.data;
+      cleanup();
+      return response.data;
+    } finally {
+      cleanup();
+    }
   }
 
   // Fallback for photos
@@ -106,4 +107,75 @@ export const deleteMediaByMessage = async (messageId) => {
   } catch (err) {
     console.error("Failed to delete message:", err);
   }
+};
+
+export const safeTelegramUpload = async ({
+  buffer,
+  fileName,
+  mimeType,
+  type = "photo",
+  caption = "",
+}) => {
+  console.log("buffer: ", buffer);
+  const BOT_TOKEN = process.env.TELEGRAM_TOKEN;
+  const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+
+  const sizeMB = (buffer.length / 1024 / 1024).toFixed(2);
+  console.log(`Uploading to Telegram: ${fileName} (${sizeMB} MB)`);
+
+  if (buffer.length > 50 * 1024 * 1024) {
+    throw new Error(`Telegram upload failed: ${fileName} exceeds 50MB`);
+  }
+
+  const form = new FormData();
+  form.append("chat_id", CHAT_ID);
+  form.append("caption", caption || fileName);
+
+  if (type === "video") {
+    let thumbPath = null;
+    let cleanup = () => {};
+
+    try {
+      // Optional: generate a thumbnail if needed
+      const thumbResult = await extractVideoThumbnail(buffer, fileName);
+      thumbPath = thumbResult.thumbPath;
+      cleanup = thumbResult.cleanup;
+
+      form.append("video", buffer, {
+        filename: fileName,
+        contentType: mimeType,
+      });
+
+      form.append("thumb", fs.createReadStream(thumbPath));
+    } catch (err) {
+      console.warn("Skipping thumbnail due to error:", err.message);
+      form.append("video", buffer, {
+        filename: fileName,
+        contentType: mimeType,
+      });
+    }
+
+    const response = await axios.post(
+      `https://api.telegram.org/bot${BOT_TOKEN}/sendVideo`,
+      form,
+      { headers: form.getHeaders() }
+    );
+
+    cleanup?.();
+    return response.data;
+  }
+
+  // Handle photo
+  form.append("photo", buffer, {
+    filename: fileName,
+    contentType: mimeType,
+  });
+
+  const response = await axios.post(
+    `https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`,
+    form,
+    { headers: form.getHeaders() }
+  );
+
+  return response.data;
 };
