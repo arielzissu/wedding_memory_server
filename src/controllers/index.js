@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
-import Media from "../../src/models/TelegramStorage.js";
-import Face from "../../src/models/Face.js";
-import Person from "../../src/models/Person.js";
+import Media from "../models/Media.js";
+import Face from "../models/Face.js";
+import Person from "../models/Person.js";
 import {
   getThumbUrl,
   getFileByFileId,
