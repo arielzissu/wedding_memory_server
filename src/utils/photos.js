@@ -1,4 +1,5 @@
 import fs from "fs";
+import { promises as fsPromise } from "fs";
 import path from "path";
 import os from "os";
 import ffmpeg from "fluent-ffmpeg";
@@ -8,6 +9,7 @@ import heicConvert from "heic-convert";
 import { execFile } from "child_process";
 import ffmpegPath from "ffmpeg-static";
 import { promisify } from "util";
+import { v4 as uuidv4 } from "uuid";
 
 const execFileAsync = promisify(execFile);
 
@@ -88,4 +90,31 @@ export const compressVideoBuffer = async (buffer, originalName) => {
   }
 
   return compressedBuffer;
+};
+
+export const createThumbnailFromVideo = async (videoBuffer, originalName) => {
+  const inputPath = path.join(os.tmpdir(), `${uuidv4()}_${originalName}`);
+  const outputFileName = inputPath
+    .replace(/\.\w+$/, ".jpg")
+    .split("/")
+    .pop();
+  const outputPath = path.join(os.tmpdir(), outputFileName);
+
+  await fsPromise.writeFile(inputPath, videoBuffer);
+
+  await new Promise((resolve, reject) => {
+    ffmpeg(inputPath).on("end", resolve).on("error", reject).screenshots({
+      count: 1,
+      folder: os.tmpdir(),
+      filename: outputFileName,
+      size: "320x?",
+    });
+  });
+
+  const thumbBuffer = await fsPromise.readFile(outputPath);
+
+  return {
+    buffer: thumbBuffer,
+    fileName: outputFileName,
+  };
 };

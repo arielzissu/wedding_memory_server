@@ -15,3 +15,7 @@ export const SUPPORTED_MEDIA_FORMATS = [
 
 export const MAX_DISTANCE_THRESHOLD = 0.55;
 // export const PADDING_CROP_RATIO = 0.4;
+
+
+// export const PHOTO_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif'];
+export const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.avi', '.webm', '.mkv'];
