@@ -1,8 +1,8 @@
 import dotenv from "dotenv";
 import path from "path";
 // import Media from "../models/Media.js";
-// import Face from "../models/Face.js";
-// import Person from "../models/Person.js";
+import Face from "../models/Face.js";
+import Person from "../models/Person.js";
 // import {
 //   getThumbUrl,
 //   getFileByFileId,
@@ -10,15 +10,15 @@ import path from "path";
 //   deleteMediaByMessage,
 //   safeTelegramUpload,
 // } from "../utils/telegramStorageUtil.js";
-// import {
-//   detectFacesFromImage,
-//   detectFacesFromVideo,
-//   cropFace,
-//   matchPerson,
-//   normalizeDescriptor,
-//   updateAverageDescriptor,
-// } from "../utils/faceDetection.js";
-// import { groupFaces } from "../utils/groupFaces.js";
+import {
+  detectFacesFromImage,
+  detectFacesFromVideo,
+  cropFace,
+  matchPerson,
+  normalizeDescriptor,
+  updateAverageDescriptor,
+} from "../utils/faceDetection.js";
+import { groupFaces } from "../utils/groupFaces.js";
 import {
   // compressVideoBuffer,
   // convertHeicToJpeg,
@@ -62,7 +62,9 @@ export const uploadImages = async (req, res) => {
         thumbnailUrl = thumbUpload.url;
       }
 
-      const fileName = await uploadToR2(
+      /////
+
+      const mainUploadFileName = await uploadToR2(
         file.buffer,
         file.originalname,
         file.mimetype,
@@ -71,10 +73,63 @@ export const uploadImages = async (req, res) => {
         isVideo ? { thumbnail_url: thumbnailUrl } : {}
       );
 
-      const fileUrl = `${process.env.R2_BUCKET_URL}/${fileName}`;
+      // Detect faces
+      const faces = isVideo
+        ? await detectFacesFromVideo(file.buffer, file.originalname)
+        : await detectFacesFromImage(file.buffer);
 
-      uploadedFiles.push({ fileName, url: fileUrl });
+      console.log("faces.length: ", faces.length);
+
+      await Promise.all(
+        faces.map(async (face, index) => {
+          const { descriptor, box } = face;
+          const croppedBuffer = await cropFace(file.buffer, box);
+
+          const croppedUpload = await uploadToR2(
+            croppedBuffer,
+            `face-${mainUploadFileName.fileName}-${index}.jpg`,
+            "image/jpeg",
+            uploadCreator,
+            weddingName,
+            { is_face: "true" }
+          );
+
+          console.log("croppedUpload: ", croppedUpload);
+
+          const normalizedDescriptor = normalizeDescriptor(descriptor);
+          const person = await matchPerson(descriptor);
+          console.log("is exists person: ", !!person);
+          const personId = person
+            ? person._id
+            : (
+                await Person.create({
+                  name: null,
+                  averageDescriptor: Array.from(normalizedDescriptor),
+                })
+              )._id;
+
+          console.log("personId: ", personId);
+
+          await Face.create({
+            mediaFileName: mainUploadFileName.fileName,
+            descriptor: Array.from(normalizedDescriptor),
+            position: box,
+            thumbnailUrl: croppedUpload.url,
+            personId,
+            originalUrl: mainUploadFileName.url,
+          });
+
+          await updateAverageDescriptor(personId);
+        })
+      );
+
+      //////
+
+      const fileUrl = `${process.env.R2_BUCKET_URL}/${mainUploadFileName}`;
+      uploadedFiles.push({ fileName: mainUploadFileName, url: fileUrl });
     }
+
+    await groupFaces(); // TODO: check if this is needed here to be called with "await"
 
     res.json({ success: true, files: uploadedFiles });
   } catch (error) {
@@ -278,6 +333,34 @@ export const getPhotos = async (req, res) => {
 //   }
 // };
 
+export const getPeople = async (_req, res) => {
+  try {
+    const people = await Person.find();
+    console.log("people.length: ", people.length);
+
+    const result = await Promise.all(
+      people.map(async (person) => {
+        const faces = await Face.find({ personId: person._id });
+
+        return {
+          personId: person._id,
+          faceCount: faces.length,
+          sampleThumbnail: faces[0]?.thumbnailUrl || null,
+          mediaFiles: faces.map((f) => ({
+            fileName: f.mediaFileName,
+            url: f.originalUrl,
+          })),
+        };
+      })
+    );
+
+    res.json(result);
+  } catch (err) {
+    console.error("Failed to fetch people:", err.message);
+    res.status(500).json({ error: "Failed to fetch people" });
+  }
+};
+
 // export const getPeople = async (_req, res) => {
 //   const people = await Person.find();
 //   const result = await Promise.all(
@@ -300,10 +383,37 @@ export const getPhotos = async (req, res) => {
 export const deletePhoto = async (req, res) => {
   try {
     const { userEmail, fileName } = req.body;
+    // Step 1: Delete file from Cloudflare R2
+    await deleteFromR2(fileName);
 
-    const isDeleted = await deleteFromR2(fileName);
+    // Step 2: Find all Faces linked to this media file
+    const facesToDelete = await Face.find({ mediaFileName: fileName });
 
-    res.json({ success: isDeleted, message: "Photo deleted" });
+    // Step 3: Collect unique personIds affected
+    const affectedPersonIds = [
+      ...new Set(
+        facesToDelete.map((face) => face.personId?.toString()).filter(Boolean)
+      ),
+    ];
+
+    // Step 4: Delete the Faces linked to this media
+    await Face.deleteMany({ mediaFileName: fileName });
+
+    // Step 5: Clean up orphaned Person records
+    for (const personId of affectedPersonIds) {
+      const remainingFaces = await Face.countDocuments({ personId });
+      if (remainingFaces === 0) {
+        await Person.findByIdAndDelete(personId);
+        console.log(`Deleted Person ${personId} with no remaining faces`);
+      }
+    }
+
+    res.json({
+      success: true,
+      deletedFaces: facesToDelete.length,
+      deletedFile: fileName,
+      deletedPersons: affectedPersonIds.length,
+    });
   } catch (error) {
     console.error("Error deleting photo:", error);
     res.status(500).json({ message: "Failed to delete photo" });

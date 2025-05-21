@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
 const faceSchema = new mongoose.Schema({
-  mediaId: { type: mongoose.Schema.Types.ObjectId, ref: "Media", required: true },
+  mediaFileName: { type: String, required: true },
   descriptor: { type: [Number], required: true }, // 128 floats
   position: {
     x: Number,
@@ -11,7 +11,8 @@ const faceSchema = new mongoose.Schema({
   },
   personId: { type: mongoose.Schema.Types.ObjectId, ref: "Person", default: null },
   createdAt: { type: Date, default: Date.now },
-  thumbnailUrl: { type: String }
+  thumbnailUrl: { type: String },
+  originalUrl: { type: String }
 });
 
 export default mongoose.model("Face", faceSchema);

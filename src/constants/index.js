@@ -13,7 +13,7 @@ export const SUPPORTED_MEDIA_FORMATS = [
     "3GP", "3G2", "MTS", "M2TS", "TS", "MXF"
 ];
 
-export const MAX_DISTANCE_THRESHOLD = 0.55;
+export const MAX_DISTANCE_THRESHOLD = 0.6;
 // export const PADDING_CROP_RATIO = 0.4;
 
 
