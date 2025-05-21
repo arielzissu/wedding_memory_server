@@ -1,27 +1,27 @@
 import dotenv from "dotenv";
 import path from "path";
-import Media from "../models/Media.js";
-import Face from "../models/Face.js";
-import Person from "../models/Person.js";
+// import Media from "../models/Media.js";
+// import Face from "../models/Face.js";
+// import Person from "../models/Person.js";
+// import {
+//   getThumbUrl,
+//   getFileByFileId,
+//   // uploadTelegramMedia,
+//   deleteMediaByMessage,
+//   safeTelegramUpload,
+// } from "../utils/telegramStorageUtil.js";
+// import {
+//   detectFacesFromImage,
+//   detectFacesFromVideo,
+//   cropFace,
+//   matchPerson,
+//   normalizeDescriptor,
+//   updateAverageDescriptor,
+// } from "../utils/faceDetection.js";
+// import { groupFaces } from "../utils/groupFaces.js";
 import {
-  getThumbUrl,
-  getFileByFileId,
-  // uploadTelegramMedia,
-  deleteMediaByMessage,
-  safeTelegramUpload,
-} from "../utils/telegramStorageUtil.js";
-import {
-  detectFacesFromImage,
-  detectFacesFromVideo,
-  cropFace,
-  matchPerson,
-  normalizeDescriptor,
-  updateAverageDescriptor,
-} from "../utils/faceDetection.js";
-import { groupFaces } from "../utils/groupFaces.js";
-import {
-  compressVideoBuffer,
-  convertHeicToJpeg,
+  // compressVideoBuffer,
+  // convertHeicToJpeg,
   createThumbnailFromVideo,
 } from "../utils/photos.js";
 import { deleteFromR2, listAllFiles, uploadToR2 } from "../utils/r2Storage.js";
@@ -278,24 +278,24 @@ export const getPhotos = async (req, res) => {
 //   }
 // };
 
-export const getPeople = async (_req, res) => {
-  const people = await Person.find();
-  const result = await Promise.all(
-    people.map(async (person) => {
-      const faces = await Face.find({ personId: person._id }).populate(
-        "mediaId"
-      );
-      return {
-        personId: person._id,
-        faceCount: faces.length,
-        sampleThumbnail: faces[0]?.thumbnailUrl,
-        mediaItems: faces.map((f) => f.mediaId),
-      };
-    })
-  );
+// export const getPeople = async (_req, res) => {
+//   const people = await Person.find();
+//   const result = await Promise.all(
+//     people.map(async (person) => {
+//       const faces = await Face.find({ personId: person._id }).populate(
+//         "mediaId"
+//       );
+//       return {
+//         personId: person._id,
+//         faceCount: faces.length,
+//         sampleThumbnail: faces[0]?.thumbnailUrl,
+//         mediaItems: faces.map((f) => f.mediaId),
+//       };
+//     })
+//   );
 
-  res.json(result);
-};
+//   res.json(result);
+// };
 
 export const deletePhoto = async (req, res) => {
   try {

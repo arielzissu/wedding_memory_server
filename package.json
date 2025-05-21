@@ -8,10 +8,9 @@
         "node": ">=18.0.0"
     },
     "keywords": [
-        "express",
-        "cloudinary",
+        "wedding-memory",
         "file-upload",
-        "wedding-memory"
+        "wedding photos"
     ],
     "scripts": {
         "start": "node src/server.js",
@@ -29,7 +28,6 @@
         "axios": "^1.7.9",
         "canvas": "^3.1.0",
         "child_process": "^1.0.2",
-        "cloudinary": "^1.41.3",
         "cors": "^2.8.5",
         "dotenv": "^16.4.7",
         "express": "^4.21.2",
@@ -43,10 +41,7 @@
         "mongodb": "^6.16.0",
         "mongoose": "^7.6.3",
         "multer": "^1.4.5-lts.1",
-        "multer-storage-cloudinary": "^4.0.0",
-        "node-telegram-bot-api": "^0.66.0",
-        "path": "^0.12.7",
-        "util": "^0.12.5"
+        "path": "^0.12.7"
     },
     "devDependencies": {
         "@eslint/js": "^9.27.0",

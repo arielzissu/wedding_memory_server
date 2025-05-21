@@ -46,7 +46,7 @@ export const listAllFiles = async (weddingName) => {
       }
 
       if (
-        metadata.is_thumbnail === "true" &&
+        metadata.is_thumbnail === "true" ||
         metadata.wedding_name !== weddingName
       ) {
         return null;
