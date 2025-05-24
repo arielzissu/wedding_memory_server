@@ -46,3 +46,19 @@ export const createThumbnailFromVideo = async (videoBuffer, originalName) => {
     fileName: outputFileName,
   };
 };
+
+export const normalizeUploadFile = async (buffer, originalName, mimeType) => {
+  let finalBuffer = buffer;
+  let finalMimeType = mimeType;
+  let finalName = originalName;
+
+  const ext = path.extname(originalName).toLowerCase();
+
+  if (ext === ".heic" || mimeType === "image/heic") {
+    finalBuffer = await convertHeicToJpeg(buffer);
+    finalMimeType = "image/jpeg";
+    finalName = originalName.replace(/\.heic$/i, ".jpg");
+  }
+
+  return { finalBuffer, finalMimeType, finalName };
+};

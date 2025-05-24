@@ -14,8 +14,8 @@ const { Canvas, Image, ImageData, createCanvas, loadImage } = canvas;
 faceApi.env.monkeyPatch({ Canvas, Image, ImageData });
 
 export const loadModels = async () => {
-  await faceApi.nets.ssdMobilenetv1.loadFromDisk(
-    path.join(MODEL_PATH, "ssd_mobilenetv1")
+  await faceApi.nets.tinyFaceDetector.loadFromDisk(
+    path.join(MODEL_PATH, "tiny_face_detector")
   );
   await faceApi.nets.faceLandmark68Net.loadFromDisk(
     path.join(MODEL_PATH, "face_landmark_68")
@@ -27,14 +27,30 @@ export const loadModels = async () => {
 
 export const detectFacesFromImage = async (imageBuffer) => {
   const img = await canvas.loadImage(imageBuffer);
+
+  // Resize if needed
+  const maxWidth = 640;
+  const scale = img.width > maxWidth ? maxWidth / img.width : 1;
+  const width = img.width * scale;
+  const height = img.height * scale;
+
+  const resizedCanvas = createCanvas(width, height);
+  const ctx = resizedCanvas.getContext("2d");
+  ctx.drawImage(img, 0, 0, width, height);
+
   const detections = await faceApi
-    .detectAllFaces(img)
+    .detectAllFaces(resizedCanvas, new faceApi.TinyFaceDetectorOptions())
     .withFaceLandmarks()
     .withFaceDescriptors();
 
   return detections.map((d) => ({
     descriptor: d.descriptor,
-    box: d.detection.box,
+    box: {
+      x: d.detection.box.x / scale,
+      y: d.detection.box.y / scale,
+      width: d.detection.box.width / scale,
+      height: d.detection.box.height / scale,
+    },
   }));
 };
 

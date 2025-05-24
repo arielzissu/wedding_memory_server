@@ -21,8 +21,9 @@ import {
 import { groupFaces } from "../utils/groupFaces.js";
 import {
   // compressVideoBuffer,
-  // convertHeicToJpeg,
+  convertHeicToJpeg,
   createThumbnailFromVideo,
+  normalizeUploadFile,
 } from "../utils/photos.js";
 import { deleteFromR2, listAllFiles, uploadToR2 } from "../utils/r2Storage.js";
 import { VIDEO_EXTENSIONS } from "../constants/index.js";
@@ -36,6 +37,9 @@ export const uploadImages = async (req, res) => {
   if (!files || files.length === 0) {
     return res.status(400).json({ error: "No files uploaded" });
   }
+
+  console.log("uploadImages...");
+  const start = performance.now();
 
   try {
     const uploadedFiles = [];
@@ -62,28 +66,45 @@ export const uploadImages = async (req, res) => {
         thumbnailUrl = thumbUpload.url;
       }
 
-      /////
+      const { finalBuffer, finalMimeType, finalName } =
+        await normalizeUploadFile(
+          file.buffer,
+          file.originalname,
+          file.mimetype
+        );
 
+      console.log("mainUploadFileName...");
+      const start2 = performance.now();
       const mainUploadFileName = await uploadToR2(
-        file.buffer,
-        file.originalname,
-        file.mimetype,
+        finalBuffer,
+        finalName,
+        finalMimeType,
         uploadCreator,
         weddingName,
         isVideo ? { thumbnail_url: thumbnailUrl } : {}
       );
+      const end2 = performance.now();
+      console.log(
+        `[mainUploadFileName] - took ${(end2 - start2).toFixed(2)} ms`
+      );
 
-      // Detect faces
+      console.log("detectFacesFromImage...");
+      const start3 = performance.now();
       const faces = isVideo
-        ? await detectFacesFromVideo(file.buffer, file.originalname)
-        : await detectFacesFromImage(file.buffer);
+        ? await detectFacesFromVideo(finalBuffer, finalName)
+        : await detectFacesFromImage(finalBuffer);
 
-      console.log("faces.length: ", faces.length);
+      const end3 = performance.now();
+      console.log(
+        `[detectFacesFromImage] - took ${(end3 - start3).toFixed(2)} ms`
+      );
 
+      console.log("Promise.all()...");
+      const start4 = performance.now();
       await Promise.all(
         faces.map(async (face, index) => {
           const { descriptor, box } = face;
-          const croppedBuffer = await cropFace(file.buffer, box);
+          const croppedBuffer = await cropFace(finalBuffer, box);
 
           const croppedUpload = await uploadToR2(
             croppedBuffer,
@@ -94,11 +115,9 @@ export const uploadImages = async (req, res) => {
             { is_face: "true" }
           );
 
-          console.log("croppedUpload: ", croppedUpload);
-
           const normalizedDescriptor = normalizeDescriptor(descriptor);
           const person = await matchPerson(descriptor);
-          console.log("is exists person: ", !!person);
+
           const personId = person
             ? person._id
             : (
@@ -107,8 +126,6 @@ export const uploadImages = async (req, res) => {
                   averageDescriptor: Array.from(normalizedDescriptor),
                 })
               )._id;
-
-          console.log("personId: ", personId);
 
           await Face.create({
             mediaFileName: mainUploadFileName.fileName,
@@ -122,14 +139,21 @@ export const uploadImages = async (req, res) => {
           await updateAverageDescriptor(personId);
         })
       );
-
-      //////
+      const end4 = performance.now();
+      console.log(`[Promise.all()] - took ${(end4 - start4).toFixed(2)} ms`);
 
       const fileUrl = `${process.env.R2_BUCKET_URL}/${mainUploadFileName}`;
       uploadedFiles.push({ fileName: mainUploadFileName, url: fileUrl });
     }
 
+    console.log("groupFaces...");
+    const start1 = performance.now();
     await groupFaces(); // TODO: check if this is needed here to be called with "await"
+    const end1 = performance.now();
+    console.log(`[groupFaces] - took ${(end1 - start1).toFixed(2)} ms`);
+
+    const end = performance.now();
+    console.log(`[uploadImages] - took ${(end - start).toFixed(2)} ms`);
 
     res.json({ success: true, files: uploadedFiles });
   } catch (error) {
@@ -335,8 +359,10 @@ export const getPhotos = async (req, res) => {
 
 export const getPeople = async (_req, res) => {
   try {
+    console.log("[getPeople] - Fetching people...");
+    const start = performance.now();
+
     const people = await Person.find();
-    console.log("people.length: ", people.length);
 
     const result = await Promise.all(
       people.map(async (person) => {
@@ -349,11 +375,18 @@ export const getPeople = async (_req, res) => {
           mediaFiles: faces.map((f) => ({
             fileName: f.mediaFileName,
             url: f.originalUrl,
+            type: VIDEO_EXTENSIONS.includes(
+              path.extname(f.mediaFileName).toLowerCase()
+            )
+              ? "video"
+              : "photo",
           })),
         };
       })
     );
 
+    const end = performance.now();
+    console.log(`[getPeople] - took ${(end - start).toFixed(2)} ms`);
     res.json(result);
   } catch (err) {
     console.error("Failed to fetch people:", err.message);
@@ -361,45 +394,21 @@ export const getPeople = async (_req, res) => {
   }
 };
 
-// export const getPeople = async (_req, res) => {
-//   const people = await Person.find();
-//   const result = await Promise.all(
-//     people.map(async (person) => {
-//       const faces = await Face.find({ personId: person._id }).populate(
-//         "mediaId"
-//       );
-//       return {
-//         personId: person._id,
-//         faceCount: faces.length,
-//         sampleThumbnail: faces[0]?.thumbnailUrl,
-//         mediaItems: faces.map((f) => f.mediaId),
-//       };
-//     })
-//   );
-
-//   res.json(result);
-// };
-
 export const deletePhoto = async (req, res) => {
   try {
     const { userEmail, fileName } = req.body;
-    // Step 1: Delete file from Cloudflare R2
     await deleteFromR2(fileName);
 
-    // Step 2: Find all Faces linked to this media file
     const facesToDelete = await Face.find({ mediaFileName: fileName });
 
-    // Step 3: Collect unique personIds affected
     const affectedPersonIds = [
       ...new Set(
         facesToDelete.map((face) => face.personId?.toString()).filter(Boolean)
       ),
     ];
 
-    // Step 4: Delete the Faces linked to this media
     await Face.deleteMany({ mediaFileName: fileName });
 
-    // Step 5: Clean up orphaned Person records
     for (const personId of affectedPersonIds) {
       const remainingFaces = await Face.countDocuments({ personId });
       if (remainingFaces === 0) {
@@ -419,47 +428,3 @@ export const deletePhoto = async (req, res) => {
     res.status(500).json({ message: "Failed to delete photo" });
   }
 };
-// export const deletePhoto = async (req, res) => {
-//   try {
-//     const { messageId, userEmail } = req.body;
-
-//     const media = await Media.findOneAndDelete({
-//       messageId,
-//       uploadCreator: userEmail,
-//     });
-
-//     if (!media) {
-//       return res.status(404).json({ message: "Photo not found" });
-//     }
-
-//     // Step 2: Find all Faces linked to this Media (to get their personId)
-//     const facesToDelete = await Face.find({ mediaId: media._id });
-
-//     // Collect affected personIds (only if face has a personId)
-//     const affectedPersonIds = [
-//       ...new Set(
-//         facesToDelete.map((face) => face.personId?.toString()).filter(Boolean)
-//       ),
-//     ];
-
-//     // Step 3: Delete the Faces linked to this Media
-//     await Face.deleteMany({ mediaId: media._id });
-
-//     // Step 4: For each affected personId, delete Person if they have no remaining faces
-//     for (const personId of affectedPersonIds) {
-//       const remainingFaces = await Face.countDocuments({ personId });
-//       if (remainingFaces === 0) {
-//         await Person.findByIdAndDelete(personId);
-//         console.log(`Deleted Person ${personId} with no remaining faces`);
-//       }
-//     }
-
-//     // Step 5: Delete the media from Telegram
-//     const isDeleted = await deleteMediaByMessage(messageId);
-
-//     res.json({ success: isDeleted, message: "Photo deleted" });
-//   } catch (error) {
-//     console.error("Error deleting photo:", error);
-//     res.status(500).json({ message: "Failed to delete photo" });
-//   }
-// };

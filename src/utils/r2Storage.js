@@ -73,19 +73,7 @@ export const uploadToR2 = async (
   weddingName,
   customMetadata = {}
 ) => {
-  let finalBuffer = buffer;
-  let finalMimeType = mimeType;
-  let finalName = originalName;
-
-  const ext = path.extname(originalName).toLowerCase();
-
-  if (ext === ".heic" || mimeType === "image/heic") {
-    finalBuffer = await convertHeicToJpeg(buffer);
-    finalMimeType = "image/jpeg";
-    finalName = originalName.replace(/\.heic$/i, ".jpg");
-  }
-
-  const fileName = `${Date.now()}_${finalName}`;
+  const fileName = `${Date.now()}_${originalName}`;
   const fileExt = path.extname(fileName).toLowerCase();
   const isVideo = VIDEO_EXTENSIONS.includes(fileExt);
 
@@ -98,8 +86,8 @@ export const uploadToR2 = async (
   const command = new PutObjectCommand({
     Bucket: process.env.R2_BUCKET_NAME,
     Key: fileName,
-    Body: finalBuffer,
-    ContentType: finalMimeType,
+    Body: buffer,
+    ContentType: mimeType,
     Metadata: metadata,
   });
 
