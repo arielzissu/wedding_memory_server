@@ -1,15 +1,7 @@
 import dotenv from "dotenv";
 import path from "path";
-// import Media from "../models/Media.js";
 import Face from "../models/Face.js";
 import Person from "../models/Person.js";
-// import {
-//   getThumbUrl,
-//   getFileByFileId,
-//   // uploadTelegramMedia,
-//   deleteMediaByMessage,
-//   safeTelegramUpload,
-// } from "../utils/telegramStorageUtil.js";
 import {
   detectFacesFromImage,
   detectFacesFromVideo,
@@ -20,8 +12,6 @@ import {
 } from "../utils/faceDetection.js";
 import { groupFaces } from "../utils/groupFaces.js";
 import {
-  // compressVideoBuffer,
-  convertHeicToJpeg,
   createThumbnailFromVideo,
   normalizeUploadFile,
 } from "../utils/photos.js";
@@ -85,57 +75,68 @@ const processUpload = async (files, uploadId, uploadCreator, weddingName) => {
 
       console.log("detectFacesFromImage...");
       const start3 = performance.now();
-      const faces = isVideo
-        ? await detectFacesFromVideo(finalBuffer, finalName)
-        : await detectFacesFromImage(finalBuffer);
+
+      let faces = [];
+      let cropBuffer = finalBuffer;
+
+      if (isVideo) {
+        const result = await detectFacesFromVideo(finalBuffer, finalName);
+        faces = result.faces;
+        cropBuffer = result.cropSource;
+      } else {
+        faces = await detectFacesFromImage(finalBuffer);
+      }
 
       const end3 = performance.now();
       console.log(
         `[detectFacesFromImage] - took ${(end3 - start3).toFixed(2)} ms`
       );
 
-      console.log("Promise.all()...");
+      console.log(`Detected ${faces.length} faces`);
+
+      console.log("upload faces...");
       const start4 = performance.now();
-      await Promise.all(
-        faces.map(async (face, index) => {
-          const { descriptor, box } = face;
-          const croppedBuffer = await cropFace(finalBuffer, box);
 
-          const croppedUpload = await uploadToR2(
-            croppedBuffer,
-            `face-${mainUploadFileName.fileName}-${index}.jpg`,
-            "image/jpeg",
-            uploadCreator,
-            weddingName,
-            { is_face: "true" }
-          );
+      for (const [index, face] of faces.entries()) {
+        const { descriptor, box } = face;
 
-          const normalizedDescriptor = normalizeDescriptor(descriptor);
-          const person = await matchPerson(descriptor);
+        const croppedBuffer = await cropFace(cropBuffer, box, 0.5);
 
-          const personId = person
-            ? person._id
-            : (
-                await Person.create({
-                  name: null,
-                  averageDescriptor: Array.from(normalizedDescriptor),
-                })
-              )._id;
+        const croppedUpload = await uploadToR2(
+          croppedBuffer,
+          `face-${mainUploadFileName.fileName}-${index}.jpg`,
+          "image/jpeg",
+          uploadCreator,
+          weddingName,
+          { is_face: "true" }
+        );
 
-          await Face.create({
-            mediaFileName: mainUploadFileName.fileName,
-            descriptor: Array.from(normalizedDescriptor),
-            position: box,
-            thumbnailUrl: croppedUpload.url,
-            personId,
-            originalUrl: mainUploadFileName.url,
-          });
+        const normalizedDescriptor = normalizeDescriptor(descriptor);
+        const person = await matchPerson(descriptor);
 
-          await updateAverageDescriptor(personId);
-        })
-      );
+        const personId = person
+          ? person._id
+          : (
+              await Person.create({
+                name: null,
+                averageDescriptor: Array.from(normalizedDescriptor),
+              })
+            )._id;
+
+        await Face.create({
+          mediaFileName: mainUploadFileName.fileName,
+          descriptor: Array.from(normalizedDescriptor),
+          position: box,
+          thumbnailUrl: croppedUpload.url,
+          personId,
+          originalUrl: mainUploadFileName.url,
+        });
+
+        await updateAverageDescriptor(personId);
+      }
+
       const end4 = performance.now();
-      console.log(`[Promise.all()] - took ${(end4 - start4).toFixed(2)} ms`);
+      console.log(`[upload faces] - took ${(end4 - start4).toFixed(2)} ms`);
 
       const fileUrl = `${process.env.R2_BUCKET_URL}/${mainUploadFileName}`;
       uploadedFiles.push({ fileName: mainUploadFileName, url: fileUrl });
@@ -147,13 +148,13 @@ const processUpload = async (files, uploadId, uploadCreator, weddingName) => {
     const end1 = performance.now();
     console.log(`[groupFaces] - took ${(end1 - start1).toFixed(2)} ms`);
 
-    const end = performance.now();
-    console.log(`[uploadImages] - took ${(end - start).toFixed(2)} ms`);
-
     await UploadStatus.updateOne(
       { uploadId },
       { $set: { status: "completed" } }
     );
+
+    const end = performance.now();
+    console.log(`[all - uploadImages] - took ${(end - start).toFixed(2)} ms`);
   } catch (error) {
     console.error("Upload failed:", error.response?.data || error.message);
     await UploadStatus.updateOne({ uploadId }, { $set: { status: "failed" } });
@@ -227,7 +228,8 @@ export const getPhotos = async (req, res) => {
   }
 };
 
-export const getPeople = async (_req, res) => {
+export const getPeople = async (req, res) => {
+  const { uploadCreator, weddingName } = req.query;
   try {
     console.log("[getPeople] - Fetching people...");
     const start = performance.now();
@@ -238,19 +240,38 @@ export const getPeople = async (_req, res) => {
       people.map(async (person) => {
         const faces = await Face.find({ personId: person._id });
 
+        const uniqueMediaMap = new Map();
+        faces.forEach((face) => {
+          if (!uniqueMediaMap.has(face.mediaFileName)) {
+            uniqueMediaMap.set(face.mediaFileName, face);
+          }
+        });
+        const uniqueFaces = Array.from(uniqueMediaMap.values());
+
+        const getPhotoType = (face) => {
+          return VIDEO_EXTENSIONS.includes(
+            path.extname(face.mediaFileName).toLowerCase()
+          )
+            ? "video"
+            : "photo";
+        };
+
         return {
           personId: person._id,
-          faceCount: faces.length,
-          sampleThumbnail: faces[0]?.thumbnailUrl || null,
-          mediaFiles: faces.map((f) => ({
-            fileName: f.mediaFileName,
-            url: f.originalUrl,
-            type: VIDEO_EXTENSIONS.includes(
-              path.extname(f.mediaFileName).toLowerCase()
-            )
-              ? "video"
-              : "photo",
-          })),
+          faceCount: uniqueFaces.length,
+          sampleThumbnail: uniqueFaces[0]?.thumbnailUrl || null,
+          mediaFiles: await Promise.all(
+            uniqueFaces.map(async (face) => ({
+              fileName: face.mediaFileName,
+              url: face.originalUrl,
+              type: getPhotoType(face),
+              metadata: {
+                uploader: uploadCreator,
+                wedding_name: weddingName,
+                thumbnail_url: face.thumbnailUrl,
+              },
+            }))
+          ),
         };
       })
     );

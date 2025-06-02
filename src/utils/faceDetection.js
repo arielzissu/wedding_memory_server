@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from "uuid";
 import Person from "../models/Person.js";
 import Face from "../models/Face.js";
 import { MAX_DISTANCE_THRESHOLD } from "../constants/index.js";
+import { tmpdir } from "os";
 
 const MODEL_PATH = path.join(process.cwd(), "face-models");
 
@@ -54,28 +55,29 @@ export const detectFacesFromImage = async (imageBuffer) => {
   }));
 };
 
-export const extractFramesFromVideo = (videoPath, frameCount = 3) => {
+export const extractFramesFromVideo = (videoPath) => {
   return new Promise((resolve, reject) => {
-    const outputDir = path.join("/tmp", uuidv4());
+    const outputDir = path.join(tmpdir(), `frames-${uuidv4()}`);
     fs.mkdirSync(outputDir, { recursive: true });
 
+    const outputPattern = path.join(outputDir, "frame-%03d.jpg");
+
     ffmpeg(videoPath)
+      .outputOptions([
+        "-vf",
+        "fps=1", // 1 frame per second
+        "-qscale:v",
+        "2", // high quality
+      ])
+      .output(outputPattern)
       .on("end", () => {
         const frames = fs
           .readdirSync(outputDir)
-          .filter((f) => f.endsWith(".jpg"));
-        if (frames.length === 0) {
-          throw new Error("No valid image frames extracted from video");
-        }
+          .map((f) => path.join(outputDir, f));
         resolve(frames);
       })
-      .on("error", reject)
-      .screenshots({
-        count: frameCount,
-        folder: outputDir,
-        filename: "frame-%i.jpg",
-        size: "320x240",
-      });
+      .on("error", (err) => reject(err))
+      .run();
   });
 };
 
@@ -86,48 +88,27 @@ export const detectFacesFromVideo = async (videoBuffer, fileName) => {
   const framePaths = await extractFramesFromVideo(videoPath);
   const allDetections = [];
 
+  let cropSource = null;
+
   for (const framePath of framePaths) {
     try {
       const buffer = fs.readFileSync(framePath);
       const detections = await detectFacesFromImage(buffer);
+      if (!cropSource && detections.length > 0) {
+        cropSource = buffer;
+      }
       allDetections.push(...detections);
     } catch (err) {
       console.warn("Skipping broken frame:", framePath, err.message);
     }
   }
 
-  if (fs.existsSync(videoPath)) {
-    fs.unlinkSync(videoPath);
-  }
+  fs.unlinkSync(videoPath);
+  framePaths.forEach((p) => fs.existsSync(p) && fs.unlinkSync(p));
 
-  framePaths.forEach((p) => {
-    if (fs.existsSync(p)) {
-      fs.unlinkSync(p);
-    }
-  });
-
-  return allDetections;
+  return { faces: allDetections, cropSource };
 };
 
-// export const cropFace = async (imageBuffer, box) => {
-//   const img = await loadImage(imageBuffer);
-//   const canvas = createCanvas(box.width, box.height);
-//   const ctx = canvas.getContext("2d");
-
-//   ctx.drawImage(
-//     img,
-//     box.x,
-//     box.y,
-//     box.width,
-//     box.height,
-//     0,
-//     0,
-//     box.width,
-//     box.height
-//   );
-
-//   return canvas.toBuffer("image/jpeg");
-// };
 export const cropFace = async (imageBuffer, box, paddingRatio = 0.3) => {
   const img = await loadImage(imageBuffer);
   const imageWidth = img.width;

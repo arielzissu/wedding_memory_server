@@ -8,7 +8,6 @@ import {
   HeadObjectCommand,
 } from "@aws-sdk/client-s3";
 import { VIDEO_EXTENSIONS } from "../constants/index.js";
-import { convertHeicToJpeg } from "./photos.js";
 
 dotenv.config();
 
