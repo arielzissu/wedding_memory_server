@@ -62,3 +62,10 @@ export const normalizeUploadFile = async (buffer, originalName, mimeType) => {
 
   return { finalBuffer, finalMimeType, finalName };
 };
+
+export const getFilesSize = (files) => {
+  const totalSizeBytes = files.reduce((sum, file) => sum + file.size, 0);
+  const totalSizeMB = (totalSizeBytes / (1024 * 1024)).toFixed(2);
+  console.log(`Total upload size: ${totalSizeBytes} bytes (${totalSizeMB} MB)`);
+  return totalSizeMB;
+};

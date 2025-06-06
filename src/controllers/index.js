@@ -13,6 +13,7 @@ import {
 import { groupFaces } from "../utils/groupFaces.js";
 import {
   createThumbnailFromVideo,
+  getFilesSize,
   normalizeUploadFile,
 } from "../utils/photos.js";
 import { deleteFromR2, listAllFiles, uploadToR2 } from "../utils/r2Storage.js";
@@ -26,6 +27,16 @@ const processUpload = async (files, uploadId, uploadCreator, weddingName) => {
   try {
     console.log("uploadImages...");
     const start = performance.now();
+
+    await UploadStatus.create({
+      uploadId,
+      status: "processing",
+      uploaderEmail: uploadCreator,
+      weddingName,
+      createdAt: new Date(),
+      totalFiles: files.length,
+      processedFiles: 0,
+    });
 
     const uploadedFiles = [];
 
@@ -100,7 +111,7 @@ const processUpload = async (files, uploadId, uploadCreator, weddingName) => {
       for (const [index, face] of faces.entries()) {
         const { descriptor, box } = face;
 
-        const croppedBuffer = await cropFace(cropBuffer, box, 0.5);
+        const croppedBuffer = await cropFace(cropBuffer, box, 0.4);
 
         const croppedUpload = await uploadToR2(
           croppedBuffer,
@@ -169,17 +180,10 @@ export const uploadImages = async (req, res) => {
     return res.status(400).json({ error: "No files uploaded" });
   }
 
-  const uploadId = new ObjectId().toString();
+  // const totalFilesSizeInMB = getFilesSize(files);
+  // console.log("totalFilesSizeInMB: ", totalFilesSizeInMB);
 
-  await UploadStatus.create({
-    uploadId,
-    status: "processing",
-    uploaderEmail: uploadCreator,
-    weddingName,
-    createdAt: new Date(),
-    totalFiles: files.length,
-    processedFiles: 0,
-  });
+  const uploadId = new ObjectId().toString();
 
   res.status(202).json({ uploadId });
 
