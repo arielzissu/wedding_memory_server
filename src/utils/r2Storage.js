@@ -52,16 +52,21 @@ export const listAllFiles = async (weddingName) => {
         return null;
       }
 
+      console.log("file: ", file);
+
       return {
         fileName: file.Key,
         url: `${process.env.R2_BUCKET_URL}/${file.Key}`,
         type: isVideo ? "video" : "photo",
         metadata,
+        lastModified: file.LastModified,
       };
     })
   );
 
-  return files.filter(Boolean);
+  return files
+    .filter(Boolean)
+    .sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified));
 };
 
 export const uploadToR2 = async (
